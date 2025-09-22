@@ -3,7 +3,7 @@ import requests
 import json
 
 def get_ai_response(messages_payload, model):
-    api_key = ""
+    api_key = "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"
     response = requests.post(
         url="https://openrouter.ai/api/v1/chat/completions",
         headers={

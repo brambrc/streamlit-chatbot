@@ -3,6 +3,7 @@ import requests
 import json
 from datetime import datetime
 import time
+import re
 
 # Page configuration
 st.set_page_config(
@@ -32,7 +33,7 @@ st.markdown("""
         margin: 5px 0;
     }
     .bot-message {
-        background-color: #white;
+        background-color: white;
         padding: 10px;
         border-radius: 15px;
         margin: 5px 0;
@@ -43,8 +44,32 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-def get_ai_response(messages_payload, model):
-    api_key = ""
+def clean_response(content):
+    """Clean up AI response by removing common markup tokens and formatting issues"""
+    if not content:
+        return ""
+    
+    # Remove common model tokens
+    tokens_to_remove = [
+        "<s>", "</s>", "<|s|>", "<|/s|>",
+        "[OUT]", "[/OUT]", "[INST]", "[/INST]",
+        "<|im_start|>", "<|im_end|>",
+        "<|assistant|>", "<|user|>", "<|system|>",
+        "<<SYS>>", "<</SYS>>",
+        "###", "Assistant:", "Human:", "User:"
+    ]
+    
+    for token in tokens_to_remove:
+        content = content.replace(token, "")
+    
+    # Remove extra whitespace and clean up
+    content = re.sub(r'\s+', ' ', content)  # Replace multiple spaces with single space
+    content = content.strip()
+    
+    return content
+
+def get_ai_response(messages_payload, model, temperature):
+    api_key = st.secrets["OPENROUTER_API_KEY"]
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
@@ -56,13 +81,16 @@ def get_ai_response(messages_payload, model):
                 "model": model,
                 "messages": messages_payload,
                 "max_tokens": 1000,
-                "temperature": 0.7,
+                "temperature": temperature,
             })
         )
         if response.status_code != 200:
             st.error(f"Error: {response.text}")
             return None
-        return response.json()["choices"][0]["message"]["content"]
+        content = response.json()["choices"][0]["message"]["content"]
+        # Clean up common markup tokens and formatting
+        content = clean_response(content)
+        return content
     except Exception as e:
         st.error(f"Error: {str(e)}")
         return None
@@ -85,6 +113,10 @@ with st.sidebar:
         "Llama 3.1 8B (Free)": {
             "id": "meta-llama/llama-3.1-8b-instruct:free",
             "description": "Meta's latest model with broad knowledge"
+        },
+        "Grok 3 (Free)": {
+            "id": "x-ai/grok-4-fast:free",
+            "description": "Grok 3 is a powerful model with strong reasoning abilities"
         }
     }
 
@@ -103,7 +135,7 @@ with st.sidebar:
     if st.button("Clear Chat History"):
         st.session_state.messages = []
         st.session_state.message_count = 0
-        st.experimental_rerun()
+        st.rerun()
 
 # Main chat interface
 st.title("🤖 AI Chatbot")
@@ -138,7 +170,7 @@ if prompt:
         with st.spinner("Thinking..."):
             messages_for_api = st.session_state.messages.copy()
             selected_model_id = model_options[selected_model_name]["id"]
-            ai_response = get_ai_response(messages_for_api, selected_model_id)
+            ai_response = get_ai_response(messages_for_api, selected_model_id, temperature)
             
             if ai_response:
                 # Add typing effect
