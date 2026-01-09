@@ -1,6 +1,10 @@
 import streamlit as st
 import requests
 import json
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Custom CSS for bubble chat styling
 st.markdown("""
@@ -49,7 +53,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def get_ai_response(messages_payload, model):
-    api_key = "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"
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        st.error("API Key tidak ditemukan. Pastikan OPENROUTER_API_KEY ada di file .env")
+        return None
     response = requests.post(
         url="https://openrouter.ai/api/v1/chat/completions",
         headers={
